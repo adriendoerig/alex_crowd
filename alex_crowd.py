@@ -34,12 +34,16 @@ def main():
     ####################################################################################################################
 
 
-    total_n_samples = 20000
+    total_n_samples = 3000
     batch_size = 25
     n_batches = total_n_samples//batch_size
 
     # save parameters
-    with open(LOGDIR + '/' + MODEL_NAME + '_parameters.txt', 'w') as f:
+    if TRAINING is True:
+        filename = LOGDIR + '/' + STIM + 'training_parameters.txt'
+    else:
+        filename = LOGDIR + '/' + STIM + 'testing_parameters.txt'
+    with open(filename, 'w') as f:
         f.write("Parameter\tvalue\n")
         variables = locals()
         variables = {key: value for key, value in variables.items()
