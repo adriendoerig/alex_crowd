@@ -17,7 +17,7 @@ def main():
 
 
     MODEL_NAME = 'alexcrowd_1'
-    STIM = 'crowded'
+    STIM = 'uncrowded'
     LOGDIR =  MODEL_NAME+'_logdir'
     N_HIDDEN = None
     TRAINING = False
@@ -381,7 +381,7 @@ def main():
             saver.restore(sess, checkpoint_path)
 
             # we will collect correct responses here: one entry per vernier decoder
-            correct_responses = np.zeros(shape=(1,9))
+            correct_responses = np.zeros(shape=(9))
             # assemble the number of correct responses for each vernier decoder
             correct_mean_all = tf.stack([correct_mean1, correct_mean2, correct_mean3, correct_mean4, correct_mean5, correct_mean6, correct_mean7,
                              correct_mean8, correct_mean_prob],axis=0, name='correct_mean_all')

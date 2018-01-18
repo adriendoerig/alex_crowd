@@ -1,8 +1,9 @@
 import numpy as np
 
-a = np.array([1, 2, 2, 3])
-b = np.array([0, 0, 1, 1])
+layers = ['conv1', 'conv2', 'conv3', 'conv4', 'conv5', 'fc6', 'fc7', 'fc8', 'prob']
 
-print(a)
-print(b)
-print(a+b)
+
+####### PLOT RESULTS #######
+
+a = np.zeros(9)
+print(np.shape(a))
