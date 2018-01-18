@@ -17,10 +17,10 @@ def main():
 
 
     MODEL_NAME = 'alexcrowd_1'
-    STIM = 'vernier'
+    STIM = 'crowded'
     LOGDIR =  MODEL_NAME+'_logdir'
     N_HIDDEN = None
-    TRAINING = True
+    TRAINING = False
     checkpoint_path = LOGDIR + '/' + MODEL_NAME + "_model.ckpt"
     restore_checkpoint = True
     continue_training_from_checkpoint = False
@@ -40,9 +40,9 @@ def main():
 
     # save parameters
     if TRAINING is True:
-        filename = LOGDIR + '/' + STIM + 'training_parameters.txt'
+        filename = LOGDIR + '/' + STIM + '_training_parameters.txt'
     else:
-        filename = LOGDIR + '/' + STIM + 'testing_parameters.txt'
+        filename = LOGDIR + '/' + STIM + '_testing_parameters.txt'
     with open(filename, 'w') as f:
         f.write("Parameter\tvalue\n")
         variables = locals()
