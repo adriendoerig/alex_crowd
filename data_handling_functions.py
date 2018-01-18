@@ -47,7 +47,7 @@ def make_dataset_from_patch(patch_folder, image_size=(227,227,3), resize_factor=
 
                 # normalize etc.
                 # zero mean, 1 stdev
-                #this_image = (this_image - np.mean(this_image)) / np.std(this_image)
+                this_image = (this_image - np.mean(this_image)) / np.std(this_image)
 
                 # add to dataset
                 data[num_images, :, :, :] = this_image
@@ -73,7 +73,7 @@ def make_dataset_from_patch(patch_folder, image_size=(227,227,3), resize_factor=
     data = data[0:num_images, :, :, :]
 
     perm = np.random.permutation(num_images)
-    data = data[perm, :, :, :]/255.0
+    data = data[perm, :, :, :]
     labels = labels[perm]
 
     if print_shapes:
