@@ -8,26 +8,48 @@ import os
 import matplotlib.pyplot as plt
 from caffe_classes import class_names
 
-
 def main():
+
+    MODEL_ID = 666
+    N_HIDDEN = 512
+    resize_factor = 1.0
+    batch_size = 125
+
+    n_runs = 10
+
+    for run in range(n_runs):
+        print('###########################################################################')
+        print('THIS IS RUN '+str(run))
+        print('###########################################################################')
+        for STIM in ['vernier', 'crowded', 'uncrowded']:
+            if 'vernier' in STIM:
+                for TRAINING in [True, False]:
+                    tf.reset_default_graph()
+                    run_alexcrowd_session(MODEL_ID=MODEL_ID, VERSION=run, STIM=STIM, N_HIDDEN=N_HIDDEN,
+                                          TRAINING=TRAINING, resize_factor=resize_factor, batch_size=batch_size,
+                                          total_n_samples=2000*batch_size, scope=(str(run)+'_'+STIM+'_'+str(TRAINING)))
+            else:
+                TRAINING = False
+                tf.reset_default_graph()
+                run_alexcrowd_session(MODEL_ID=MODEL_ID, VERSION=run, STIM=STIM, N_HIDDEN=N_HIDDEN,
+                                      TRAINING=TRAINING, resize_factor=resize_factor, batch_size=batch_size,
+                                      total_n_samples=3000, scope=(str(run)+'_'+STIM+'_'+str(TRAINING)))
+
+
+def run_alexcrowd_session(MODEL_ID, VERSION, STIM, N_HIDDEN, TRAINING, resize_factor, batch_size, total_n_samples, scope):
 
     ####################################################################################################################
     # Model name and logdir. Choose to train or not. Checkpoint for model saving
     ####################################################################################################################
 
 
-    MODEL_ID = 1000
-    STIM = 'vernier'
-    N_HIDDEN = 512
-    TRAINING = True
-    resize_factor = 1.5
-
     if N_HIDDEN is None:
-        MODEL_NAME = 'alexcrowd_' + str(MODEL_ID) + '_resize_' + str(resize_factor)
+        MODEL_NAME = 'alexcrowd_batch_norm_' + str(MODEL_ID)
+        LOGDIR = MODEL_NAME + '_logdir/version_' + str(VERSION) + '_resize_' + str(resize_factor)
     else:
-        MODEL_NAME = 'alexcrowd_' + str(MODEL_ID) + '_hidden_' + str(N_HIDDEN) + '_resize_' + str(resize_factor)
-    LOGDIR = MODEL_NAME+'_logdir'
-    checkpoint_path = LOGDIR + '/' + MODEL_NAME + "_model.ckpt"
+        MODEL_NAME = 'alexcrowd_batch_norm_' + str(MODEL_ID)
+        LOGDIR = MODEL_NAME + '_logdir/version_' + str(VERSION) + '_hidden_' + str(N_HIDDEN) + '_resize_' + str(resize_factor)
+    checkpoint_path = LOGDIR + '/' + MODEL_NAME + '_hidden_' + str(N_HIDDEN) + '_resize_' + str(resize_factor) + "_model.ckpt"
     restore_checkpoint = True
     continue_training_from_checkpoint = False
 
@@ -40,8 +62,6 @@ def main():
     ####################################################################################################################
 
 
-    total_n_samples = 125*6#1000000
-    batch_size = 125
     n_batches = total_n_samples//batch_size
 
     # save parameters
@@ -66,6 +86,7 @@ def main():
     x = tf.placeholder(tf.float32, [None, 227, 227, 3], name='input_image')
     tf.summary.image('input', x, 6)
     y = tf.placeholder(tf.int64, [None], name='input_label')
+    is_training = tf.placeholder(tf.bool, (), name='is_training')
 
     net_data = np.load(open("bvlc_alexnet.npy", "rb"), encoding="latin1").item()
 
@@ -81,14 +102,14 @@ def main():
         conv1b = tf.Variable(net_data["conv1"][1])
         conv1_in = conv(x, conv1W, conv1b, k_h, k_w, c_o, s_h, s_w, padding="SAME", group=1)
         conv1 = tf.nn.relu(conv1_in)
-        tf.summary.histogram('conv1',conv1)
+        # tf.summary.histogram('conv1',conv1)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier1'):
-        classifier1 = vernier_classifier(conv1, N_HIDDEN)
+        classifier1 = vernier_classifier(conv1, is_training, N_HIDDEN, name='classifier1')
         x_entropy1 = vernier_x_entropy(classifier1,y)
         correct_mean1 = vernier_correct_mean(tf.argmax(classifier1, axis=1), y) # match correct prediction to each entry in y
-        train_op1 = tf.train.AdamOptimizer().minimize(x_entropy1,
+        train_op1 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy1,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier1'),
                                                        name="training_op")
 
@@ -128,14 +149,14 @@ def main():
         conv2b = tf.Variable(net_data["conv2"][1])
         conv2_in = conv(maxpool1, conv2W, conv2b, k_h, k_w, c_o, s_h, s_w, padding="SAME", group=group)
         conv2 = tf.nn.relu(conv2_in)
-        tf.summary.histogram('conv2',conv2)
+        # tf.summary.histogram('conv2',conv2)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier2'):
-        classifier2 = vernier_classifier(conv2, N_HIDDEN)
+        classifier2 = vernier_classifier(conv2, is_training, N_HIDDEN, name='classifier2')
         x_entropy2 = vernier_x_entropy(classifier2,y)
         correct_mean2 = vernier_correct_mean(tf.argmax(classifier2, axis=1), y) # match correct prediction to each entry in y
-        train_op2 = tf.train.AdamOptimizer().minimize(x_entropy2,
+        train_op2 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy2,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier2'),
                                                        name="training_op")
 
@@ -175,14 +196,14 @@ def main():
         conv3b = tf.Variable(net_data["conv3"][1])
         conv3_in = conv(maxpool2, conv3W, conv3b, k_h, k_w, c_o, s_h, s_w, padding="SAME", group=group)
         conv3 = tf.nn.relu(conv3_in)
-        tf.summary.histogram('conv3',conv3)
+        # tf.summary.histogram('conv3',conv3)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier3'):
-        classifier3 = vernier_classifier(conv3, N_HIDDEN)
+        classifier3 = vernier_classifier(conv3, is_training, N_HIDDEN, name='classifier3')
         x_entropy3 = vernier_x_entropy(classifier3,y)
         correct_mean3 = vernier_correct_mean(tf.argmax(classifier3, axis=1), y)  # match correct prediction to each entry in y
-        train_op3 = tf.train.AdamOptimizer().minimize(x_entropy3,
+        train_op3 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy3,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier3'),
                                                        name="training_op")
 
@@ -199,14 +220,14 @@ def main():
         conv4b = tf.Variable(net_data["conv4"][1])
         conv4_in = conv(conv3, conv4W, conv4b, k_h, k_w, c_o, s_h, s_w, padding="SAME", group=group)
         conv4 = tf.nn.relu(conv4_in)
-        tf.summary.histogram('conv4',conv4)
+        # tf.summary.histogram('conv4',conv4)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier4'):
-        classifier4 = vernier_classifier(conv4, N_HIDDEN)
+        classifier4 = vernier_classifier(conv4, is_training, N_HIDDEN, name='classifier4')
         x_entropy4 = vernier_x_entropy(classifier4,y)
         correct_mean4 = vernier_correct_mean(tf.argmax(classifier4, axis=1), y)  # match correct prediction to each entry in y
-        train_op4 = tf.train.AdamOptimizer().minimize(x_entropy4,
+        train_op4 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy4,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier4'),
                                                        name="training_op")
 
@@ -223,14 +244,14 @@ def main():
         conv5b = tf.Variable(net_data["conv5"][1])
         conv5_in = conv(conv4, conv5W, conv5b, k_h, k_w, c_o, s_h, s_w, padding="SAME", group=group)
         conv5 = tf.nn.relu(conv5_in)
-        tf.summary.histogram('conv5',conv5)
+        # tf.summary.histogram('conv5', conv5)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier5'):
-        classifier5 = vernier_classifier(conv5, N_HIDDEN)
+        classifier5 = vernier_classifier(conv5, is_training, N_HIDDEN, name='classifier5')
         x_entropy5 = vernier_x_entropy(classifier5,y)
         correct_mean5 = vernier_correct_mean(tf.argmax(classifier5, axis=1), y)  # match correct prediction to each entry in y
-        train_op5 = tf.train.AdamOptimizer().minimize(x_entropy5,
+        train_op5 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy5,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier5'),
                                                        name="training_op")
 
@@ -250,14 +271,14 @@ def main():
         fc6W = tf.Variable(net_data["fc6"][0])
         fc6b = tf.Variable(net_data["fc6"][1])
         fc6 = tf.nn.relu_layer(tf.reshape(maxpool5, [-1, int(np.prod(maxpool5.get_shape()[1:]))]), fc6W, fc6b)
-        tf.summary.histogram('fc6',fc6)
+        # tf.summary.histogram('fc6',fc6)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier6'):
-        classifier6 = vernier_classifier(fc6, N_HIDDEN)
+        classifier6 = vernier_classifier(fc6, is_training, N_HIDDEN, name='classifier6')
         x_entropy6 = vernier_x_entropy(classifier6,y)
         correct_mean6 = vernier_correct_mean(tf.argmax(classifier6, axis=1), y)  # match correct prediction to each entry in y
-        train_op6 = tf.train.AdamOptimizer().minimize(x_entropy6,
+        train_op6 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy6,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier6'),
                                                        name="training_op")
 
@@ -267,14 +288,14 @@ def main():
         fc7W = tf.Variable(net_data["fc7"][0])
         fc7b = tf.Variable(net_data["fc7"][1])
         fc7 = tf.nn.relu_layer(fc6, fc7W, fc7b)
-        tf.summary.histogram('fc7', fc7)
+        # tf.summary.histogram('fc7', fc7)
 
     # vernier classifier for this layer
     with tf.variable_scope('decode_vernier7'):
-        classifier7 = vernier_classifier(fc7, N_HIDDEN)
+        classifier7 = vernier_classifier(fc7, is_training, N_HIDDEN, name='classifier7')
         x_entropy7 = vernier_x_entropy(classifier7,y)
         correct_mean7 = vernier_correct_mean(tf.argmax(classifier7, axis=1), y)  # match correct prediction to each entry in y
-        train_op7 = tf.train.AdamOptimizer().minimize(x_entropy7,
+        train_op7 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy7,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier7'),
                                                        name="training_op")
 
@@ -284,13 +305,13 @@ def main():
         fc8W = tf.Variable(net_data["fc8"][0])
         fc8b = tf.Variable(net_data["fc8"][1])
         fc8 = tf.nn.xw_plus_b(fc7, fc8W, fc8b)
-        tf.summary.histogram('fc7', fc7)
+        # tf.summary.histogram('fc8', fc8)
 
     with tf.variable_scope('decode_vernier8'):
-        classifier8 = vernier_classifier(fc8, N_HIDDEN)
+        classifier8 = vernier_classifier(fc8, is_training, N_HIDDEN, name='classifier8')
         x_entropy8 = vernier_x_entropy(classifier8,y)
         correct_mean8 = vernier_correct_mean(tf.argmax(classifier8, axis=1), y)  # match correct prediction to each entry in y
-        train_op8 = tf.train.AdamOptimizer().minimize(x_entropy8,
+        train_op8 = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy8,
                                                        var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier8'),
                                                        name="training_op")
 
@@ -298,13 +319,13 @@ def main():
     # softmax(name='prob'))
     with tf.name_scope('prob'):
         prob = tf.nn.softmax(fc8)
-        tf.summary.histogram('prob',prob)
+        #tf.summary.histogram('prob',prob)
 
     with tf.variable_scope('decode_vernier_prob'):
-        classifier_prob = vernier_classifier(prob, N_HIDDEN)
+        classifier_prob = vernier_classifier(prob, is_training, N_HIDDEN, name='classifier_prob')
         x_entropy_prob = vernier_x_entropy(classifier_prob,y)
         correct_mean_prob = vernier_correct_mean(tf.argmax(classifier_prob, axis=1), y)  # match correct prediction to each entry in y
-        train_op_prob = tf.train.AdamOptimizer().minimize(x_entropy_prob,
+        train_op_prob = tf.train.AdamOptimizer(learning_rate=0.000001).minimize(x_entropy_prob,
                                                            var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier_prob'),
                                                            name="training_op")
 
@@ -320,11 +341,12 @@ def main():
         # saver = tf.train.Saver(var_list=tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope='decode_vernier'))
         init = tf.global_variables_initializer()
         summary = tf.summary.merge_all()
-        master_training_op = [train_op1, train_op2, train_op3, train_op4, train_op5, train_op6, train_op7, train_op8, train_op_prob]
+        update_batch_norm_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        master_training_op = [train_op1, train_op2, train_op3, train_op4, train_op5, train_op6, train_op7, train_op8, train_op_prob, update_batch_norm_ops]
 
         with tf.Session() as sess:
 
-            print('Training...')
+            print('Training ' + STIM + '...')
             writer = tf.summary.FileWriter(LOGDIR+'/'+STIM+'_training', sess.graph)
 
             if restore_checkpoint and tf.train.checkpoint_exists(checkpoint_path):
@@ -349,7 +371,8 @@ def main():
                         _, summ = sess.run(
                             [master_training_op, summary],
                             feed_dict={x: batch_data,
-                                       y: batch_labels})
+                                       y: batch_labels,
+                                       is_training: TRAINING})
                         writer.add_summary(summ, iteration)
 
                     else:
@@ -357,7 +380,8 @@ def main():
                         # Run the training operation and measure the losses:
                         _ = sess.run(master_training_op,
                             feed_dict={x: batch_data,
-                                       y: batch_labels})
+                                       y: batch_labels,
+                                       is_training: TRAINING})
 
                     print("\rIteration: {}/{} ({:.1f}%)".format(
                         iteration, n_batches,
@@ -382,7 +406,7 @@ def main():
 
         with tf.Session() as sess:
 
-            print('Testing...')
+            print('Testing '+STIM+'...')
             writer = tf.summary.FileWriter(LOGDIR+'/'+STIM+'_testing', sess.graph)
             saver.restore(sess, checkpoint_path)
 
@@ -403,18 +427,19 @@ def main():
                 if iteration % 5 == 0:
 
                     # Run the training operation, measure the losses and write summary:
-                    correct_in_this_batch_all, summ = sess.run(
-                        [correct_mean_all, summary],
-                        feed_dict={x: batch_data,
-                                   y: batch_labels})
+                    correct_in_this_batch_all, summ = sess.run([correct_mean_all, summary],
+                                                               feed_dict={x: batch_data,
+                                                                          y: batch_labels,
+                                                                is_training: TRAINING})
                     writer.add_summary(summ, iteration)
 
                 else:
 
                     # Run the training operation and measure the losses:
                     correct_in_this_batch_all = sess.run(correct_mean_all,
-                                 feed_dict={x: batch_data,
-                                            y: batch_labels})
+                                                         feed_dict={x: batch_data,
+                                                                    y: batch_labels,
+                                                                    is_training: TRAINING})
 
                 correct_responses += np.array(correct_in_this_batch_all)
 
@@ -468,29 +493,48 @@ def conv(input, kernel, biases, k_h, k_w, c_o, s_h, s_w, padding="VALID", group=
     return tf.reshape(tf.nn.bias_add(conv, biases), [-1] + conv.get_shape().as_list()[1:])
 
 
+def batch_norm_layer(x, n_out, phase, name='', activation=None):
+    with tf.variable_scope('batch_norm_layer'):
+        h1 = tf.layers.dense(x, n_out, activation=None, name=name)
+        h2 = tf.contrib.layers.batch_norm(h1, center=True, scale=True, is_training=phase, scope=name+'bn')
+    if activation is None:
+        return h2
+    else:
+        return activation(h2)
 
-def vernier_classifier(input, n_hidden=1024):
-    with tf.name_scope('classifier'):
+def vernier_classifier(input, is_training, n_hidden=1024, name=''):
+    with tf.name_scope(name):
         batch_size = tf.shape(input)[0]
 
         # find how many units are in this layer to flatten it
         items_to_multiply = len(np.shape(input))-1
         n_units = 1
-        for i in range(1,items_to_multiply+1):
+        for i in range(1, items_to_multiply+1):
             n_units = n_units*int(np.shape(input)[i])
 
         flat_input = tf.reshape(input, [batch_size, n_units])
+        tf.summary.histogram('classifier_input_no_bn', flat_input)
+
+        flat_input = tf.contrib.layers.batch_norm(flat_input, center=True, scale=True, is_training=is_training,
+                                                  scope=name + 'input_bn')
+        tf.summary.histogram('classifier_input_bn', flat_input)
+
         if n_hidden is None:
             classifier_fc = tf.layers.dense(flat_input, 2, name='classifier_top_fc')
-            tf.summary.histogram('classifier_fc', classifier_fc)
+            # classifier_fc = batch_norm_layer(flat_input, 2, is_training, name='classifier_fc')
+            tf.summary.histogram(name+'_fc', classifier_fc)
         else:
             with tf.device('/cpu:0'):
-                classifier_hidden = tf.layers.dense(flat_input, n_hidden, name='classifier_hidden_fc')
-                tf.summary.histogram('classifier_hidden', classifier_hidden)
-            classifier_fc = tf.layers.dense(classifier_hidden, 2, name='classifier_top_fc')
-            tf.summary.histogram('classifier_fc', classifier_fc)
+                classifier_hidden = tf.layers.dense(flat_input, n_hidden, activation=tf.nn.elu, name=name+'_hidden_fc')
+                # classifier_hidden = batch_norm_layer(flat_input, n_hidden, is_training,
+                # activation=tf.nn.relu, name='classifier_hidden_fc')
+                tf.summary.histogram(name+'_hidden', classifier_hidden)
+            classifier_fc = tf.layers.dense(classifier_hidden, 2, activation=tf.nn.elu, name=name+'_top_fc')
+            # classifier_fc = batch_norm_layer(classifier_hidden, 2, is_training, name='classifier_top_fc')
+            tf.summary.histogram(name+'_fc', classifier_fc)
             
         classifier_out = tf.nn.softmax(classifier_fc, name='softmax')
+        
         return classifier_out
 
 
@@ -509,6 +553,7 @@ def vernier_correct_mean(prediction, label):
         correct_mean = tf.reduce_mean(tf.cast(correct, tf.float32), name="correct_mean")
         tf.summary.scalar('correct_mean', correct_mean)
         return correct_mean
+
 
 if __name__=="__main__":
    main()

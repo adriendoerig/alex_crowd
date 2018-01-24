@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # load results
-LOGDIR = 'alexcrowd_1_logdir'
+LOGDIR = 'alexcrowd_batch_norm_5_logdir\\version_0_hidden_512_resize_2.0'
 vernier = np.squeeze(np.load(LOGDIR+'/vernier_percent_correct.npy'))
 crowded = np.squeeze(np.load(LOGDIR+'/crowded_percent_correct.npy'))
 uncrowded = np.squeeze(np.load(LOGDIR+'/uncrowded_percent_correct.npy'))
@@ -20,7 +20,7 @@ width = 0.25        # the width of the bars
 fig, ax = plt.subplots()
 rects1 = ax.bar(ind, vernier, width, color=(146./255, 181./255, 88./255))
 rects2 = ax.bar(ind + width, crowded, width, color=(220./255, 76./255, 70./255))
-rects3 = ax.bar(ind + 2*width, crowded, width, color=(79./255, 132./255, 196./255))
+rects3 = ax.bar(ind + 2*width, uncrowded, width, color=(79./255, 132./255, 196./255))
 
 # add some text for labels, title and axes ticks, and save figure
 ax.set_ylabel('Percent correct')
